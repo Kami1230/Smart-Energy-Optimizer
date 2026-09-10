@@ -1,4 +1,4 @@
-# ⚡ Smart Energy Optimizer
+# Smart Energy Optimizer
 
 [![MATLAB](https://img.shields.io/badge/MATLAB-Simulink-orange?logo=mathworks&logoColor=white)](https://www.mathworks.com/products/simulink.html)
 [![SystemVerilog](https://img.shields.io/badge/HDL-SystemVerilog-blue)](https://www.mathworks.com/discovery/systemverilog.html)
@@ -11,7 +11,7 @@ Originally started as a small-scale H-Darrieus VAWT (adaptive-blade wind turbine
 
 ---
 
-## 🚦 Current Status
+## Current Status
 
 This project is under active development. Here's what's actually working today vs. what's planned:
 
@@ -31,7 +31,7 @@ This project is under active development. Here's what's actually working today v
 
 ---
 
-## 🧠 What's built so far
+## What's built so far
 
 ### Plant model (Simulink/Simscape)
 - **PV source**: Simscape Solar Cell block, configured as a 9-cell series string (single-cell Voc of 0.6V was too low to source current into the bus voltage — moving to a series string fixed this)
@@ -57,7 +57,7 @@ Implemented with Relational/Logical Operator blocks feeding a Switch, with a hys
 
 ---
 
-## 🎯 Target Architecture (Planned)
+## Target Architecture (Planned)
 
 The current Simulink controller is a functional prototype. The plan is to reimplement the same control logic twice more — once as a Stateflow chart / SystemVerilog FSM (for RTL/hardware), and once in Arduino C/C++ (for a physical microcontroller demo) — validating each against the same plant model and test scenarios.
 
@@ -106,7 +106,7 @@ Dashed lines = not yet implemented.
 
 ---
 
-## 📦 Repository Structure
+## Repository Structure
 
 > Reflects what's actually in the repo today — sections will grow as each stage is built.
 
@@ -122,7 +122,7 @@ Planned additions as the project progresses: `rtl/` (SystemVerilog FSM + package
 
 ---
 
-## ⚙️ Quick Start
+## Quick Start
 
 ### 1) Clone the repository
 
@@ -154,7 +154,7 @@ cd Smart-Energy-Optimzer
 
 ---
 
-## 🧪 Validation Scenarios (current)
+## Validation Scenarios (current)
 
 1. Steady-state (flat load, flat solar) — confirms no errors, sane bus voltage
 2. Load step (1A → 3A) — confirms battery/PV branches respond correctly
@@ -166,7 +166,7 @@ Planned (once Stateflow/Arduino/SystemVerilog versions exist): the six-scenario 
 
 ---
 
-## 🛣️ Roadmap
+## Roadmap
 
 - [x] Build and validate Simulink plant model
 - [x] Build rule-based controller with hysteresis + slew limiting
@@ -180,6 +180,6 @@ Planned (once Stateflow/Arduino/SystemVerilog versions exist): the six-scenario 
 
 ---
 
-## 🙌 Acknowledgments
+## Acknowledgments
 
 Inspired by controller-in-the-loop and microgrid simulation workflows used in modern power systems R&D. Originally scoped as a physical VAWT prototype for a science fair; pivoted to this simulation-first approach.
