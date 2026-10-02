@@ -5,13 +5,13 @@ package battery_fsm_pkg;
 // real _value = fixed_value /256.0
 
     typedef logic signed [15:0] fixed_t;
-    localparam int SCALE = 256
+    localparam int SCALE = 256;
 
 // ---------------------------state encoding-----------------------------
     typedef enum logic [2:0] {
         IDLE        = 3'd0,
         CHARGING    = 3'd1,
-        DISCHARGIN  = 3'd2,
+        DISCHARGING = 3'd2,
         LOAD_SHED   = 3'd3,
         FAULT       = 3'd4
     } state_t;
