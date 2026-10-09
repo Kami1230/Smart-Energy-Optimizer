@@ -38,3 +38,7 @@ codegen/
 # SimBiology backup files
 *.sbproj.backup
 *.sbproj.bak
+
+# Verilog simulation output files
+*.vvp
+*.vcd
