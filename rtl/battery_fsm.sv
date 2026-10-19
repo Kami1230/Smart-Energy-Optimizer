@@ -84,12 +84,27 @@ module battery_fsm (
         end
     end
 
+    //-----------------------RATE LIMITER------------------------------------/
+    localparam fixed_t STEP = 16'sd26;     // ~0.1A per clock in Q8/8
+    fixed_t target;                        // state logic target
+
+    always_ff @(posedge clk or negedge rst_n) begin
+        if (!rst_n)
+            battery_cmd <= '0;
+        else if (target > battery_cmd + STEP)
+            battery_cmd <= battery_cmd + STEP;
+        else if (target < battery_cmd - STEP)
+            battery_cmd <= battery_cmd - STEP;
+        else
+            battery_cmd <= target;
+    end
+
     // ----------------------OUTPUT LOGIC(Moore)----------------------------/
     always_comb begin
         case(state)
-            CHARGING:    battery_cmd = surplus; // command = available surplus
-            DISCHARGING: battery_cmd = surplus; // negative surplus = discharge amount
-            default:     battery_cmd = '0;      // IDLE, LOAD_SHED, FAULE: no command
+            CHARGING:    target = surplus; // command = available surplus
+            DISCHARGING: target = surplus; // negative surplus = discharge amount
+            default:     target = '0;      // IDLE, LOAD_SHED, FAULT: no command
         endcase
     end
 endmodule
