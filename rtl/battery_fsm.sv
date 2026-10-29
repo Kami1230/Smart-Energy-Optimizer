@@ -24,8 +24,8 @@ module battery_fsm (
     logic surplus_pos, surplus_neg, high_demand;
 
     assign battery_full         = (soc >= SOC_FULL);
-    assign battery_low          = (soc < SOC_LOW) && (soc >= SOC_CRITICAL);
-    assign battery_critical     = (soc < SOC_CRITICAL);
+    assign battery_low          = (soc < SOC_LOW) && (soc > SOC_CRITICAL);
+    assign battery_critical     = (soc <= SOC_CRITICAL);
     assign battery_has_charge   = (soc > SOC_CRITICAL);
     assign surplus_pos          = (surplus > SURPLUS_THRESHOLD);
     assign surplus_neg          = (surplus < -SURPLUS_THRESHOLD);
@@ -91,6 +91,8 @@ module battery_fsm (
     always_ff @(posedge clk or negedge rst_n) begin
         if (!rst_n)
             battery_cmd <= '0;
+        else if (state == FAULT || next_state == FAULT)
+            battery_cmd <= '0;                 // fault: cut immediately, no ramp
         else if (target > battery_cmd + STEP)
             battery_cmd <= battery_cmd + STEP;
         else if (target < battery_cmd - STEP)
