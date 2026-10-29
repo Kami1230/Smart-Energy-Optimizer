@@ -1,0 +1,35 @@
+[*]
+[*] GTKWave Analyzer v3.3.127 (w)1999-2026 BSI
+[*] Wed Oct 21 06:47:44 2026
+[*]
+[dumpfile] "C:\Users\kamio\Coding Projects\Hardware Stuff\Smart Energy Optimzer\docs\gtkwave\directed.vcd"
+[savefile] "C:\Users\kamio\Coding Projects\Hardware Stuff\Smart Energy Optimzer\docs\gtkwave\scenario_C7_boundary_shed.gtkw"
+[timestart] 980000
+[size] 2304 1415
+[pos] -1 -1
+*-13.165273 1031620 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1
+[treeopen] battery_fsm_directed_tb.
+[sst_width] 310
+[signals_width] 234
+[sst_expanded] 1
+[sst_vpaned_height] 438
+@28
+battery_fsm_directed_tb.clk
+@29
+battery_fsm_directed_tb.state[2:0]
+@22
+battery_fsm_directed_tb.soc[15:0]
+battery_fsm_directed_tb.surplus[15:0]
+@28
+battery_fsm_directed_tb.charger_conn
+battery_fsm_directed_tb.load_conn
+battery_fsm_directed_tb.fault_detect
+battery_fsm_directed_tb.fault_clear
+@22
+battery_fsm_directed_tb.battery_cmd[15:0]
+@28
+battery_fsm_directed_tb.dut.next_state[2:0]
+battery_fsm_directed_tb.dut.battery_low
+battery_fsm_directed_tb.dut.high_demand
+[pattern_trace] 1
+[pattern_trace] 0

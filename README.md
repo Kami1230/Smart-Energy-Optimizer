@@ -1,185 +1,177 @@
 # Smart Energy Optimizer
 
 [![MATLAB](https://img.shields.io/badge/MATLAB-Simulink-orange?logo=mathworks&logoColor=white)](https://www.mathworks.com/products/simulink.html)
-[![SystemVerilog](https://img.shields.io/badge/HDL-SystemVerilog-blue)](https://www.mathworks.com/discovery/systemverilog.html)
-[![Status](https://img.shields.io/badge/Project-Active--WIP-yellow)](https://github.com/Kami1230/Smart-Energy-Optimzer)
-[![License](https://img.shields.io/badge/License-MIT-lightgrey)](./LICENSE)
+[![SystemVerilog](https://img.shields.io/badge/HDL-SystemVerilog-blue)](https://github.com/Kami1230/Smart-Energy-Optimizer)
+[![Status](https://img.shields.io/badge/V1-In%20Progress-yellow)](https://github.com/Kami1230/Smart-Energy-Optimizer)
 
-A simulation-driven **microgrid energy management controller** that makes real-time decisions for battery charge/discharge based on solar generation and load demand — built as a stepping stone toward a full hardware-style FSM controller (SystemVerilog RTL) and an Arduino embedded implementation.
+A five-state battery and microgrid controller for a simulated microgrid or event venue. It decides when to charge, discharge, shed non-critical load, remain idle, or enter a fault state.
 
-Originally started as a small-scale H-Darrieus VAWT (adaptive-blade wind turbine) science fair project; pivoted to this software/simulation-based microgrid optimizer to keep the core control-systems learning goals intact without needing to rebuild the physical prototype.
+The project will implement the same controller specification in three forms:
 
----
+| Version | Status | Focus |
+|---|---|---|
+| V1 - Simulink and SystemVerilog | **IN PROGRESS** | Modeling, RTL, fixed-point arithmetic, verification |
+| V2 - Arduino | **PLANNED** | Embedded C, sensors, actuators, model calibration |
+| V3 - FPGA | **PLANNED / STRETCH** | Synthesis, interfaces, timing, clock-domain basics |
 
 ## Current Status
 
-This project is under active development. Here's what's actually working today vs. what's planned:
+V1 combines a Simulink microgrid model with a SystemVerilog controller using signed Q8.8 power and state-of-charge values. The output is a rate-limited battery command.
 
-| Component | Status |
+| Milestone | Status |
 |---|---|
-| Simulink plant model (PV + battery + variable load) | ✅ Built & validated |
-| Plant validation (steady-state, load-step, solar-step tests) | ✅ Passing |
-| Rule-based charge/discharge controller (Simulink) | ✅ Working, stable |
-| Hysteresis + slew-rate limiting (anti-chatter tuning) | ✅ Implemented |
-| Stateflow reimplementation of controller | 🔜 In Progress |
-| Arduino C/C++ controller port | 🔜 Not started |
-| SystemVerilog FSM controller | 🔜 In Progress |
-| Load-shedding / priority-tier logic | 🔜 Planned (not in current controller) |
-| Wind as second generation source | 🔜 Stretch goal |
+| M1 - Simulink plant, reference controller, and logging | **DONE** |
+| M2 - Five-state RTL FSM and regression tests | **DONE** |
+| M3 - Closed-loop plant scenarios and plots | **NOT STARTED** |
 
-**In short:** the plant model and a basic 3-state (idle / charge / discharge) rule-based controller are done and validated in Simulink. Everything past that — Stateflow, Arduino, SystemVerilog, load-shedding, multi-source support — is roadmap, not yet built.
+Current verification results:
 
----
+- **91 directed checks passed**
+- **0 mismatches across 199 compared samples**
+- The first two of 201 loaded samples are skipped for the two-clock pipeline latency; tolerance is +/-16 LSB
 
-## What's built so far
+## Verification Waveforms
 
-### Plant model (Simulink/Simscape)
-- **PV source**: Simscape Solar Cell block, configured as a 9-cell series string (single-cell Voc of 0.6V was too low to source current into the bus voltage — moving to a series string fixed this)
-- **Battery**: Simscape Table-Based Battery (27 A·hr, initial SoC 0.5), in series with a small resistor to keep the model well-posed for the solver
-- **Variable load**: Controlled Current Source driven by a step input
-- **Instrumentation**: current sensors on all three branches (Ipv, Iload, IBattery) plus a bus voltage sensor, all tagged and scoped
+![Fault command cutoff](docs/waveforms/fault-command-cutoff.png)
 
-### Validation performed
-1. Steady-state check (flat inputs, confirm no errors, sane values)
-2. Load-only step response (1A → 3A)
-3. Solar-only step response (100% → 30% availability)
-4. Combined scenario (both steps active)
+**Fault cutoff:** entering `FAULT` immediately forces `battery_cmd` to zero.
 
-Along the way this surfaced and fixed several real bugs worth noting for anyone building similar models: a ground short that pinned the bus at 0V, an algebraic loop from three zero-impedance sources sharing a node, a current sensor wired in shunt instead of series, a PV branch return path that looped back to the same rail instead of ground, and reversed polarity on the load current source.
+![High-demand boundary](docs/waveforms/high-demand-boundary.png)
 
-### Controller (Simulink, rule-based)
-Simple 3-mode logic:
-- **Charge** when `Ipv − Iload > threshold` AND `SoC < 0.9`
-- **Discharge** when `Ipv − Iload < −threshold` AND `SoC > 0.1`
-- **Idle** otherwise
+**High-demand boundary:** `LOAD_SHED` begins only when the deficit moves past the configured threshold.
 
-Implemented with Relational/Logical Operator blocks feeding a Switch, with a hysteresis dead-band (±2A) and a Rate Limiter on the output to prevent bang-bang chattering between charge/discharge states.
+![Command ramp](docs/waveforms/command-ramp.png)
 
----
+**Command ramp:** the Q8.8 battery command advances toward its target at the configured rate.
 
-## Target Architecture (Planned)
+## Controller Specification
 
-The current Simulink controller is a functional prototype. The plan is to reimplement the same control logic twice more — once as a Stateflow chart / SystemVerilog FSM (for RTL/hardware), and once in Arduino C/C++ (for a physical microcontroller demo) — validating each against the same plant model and test scenarios.
+The five states are `IDLE`, `CHARGING`, `DISCHARGING`, `LOAD_SHED`, and `FAULT`.
+The Simulink model provides the plant and reference output; exported vectors verify the RTL FSM and its battery-command rate limiter.
 
 ```mermaid
-flowchart LR
-    subgraph PLANT["Plant Model (Simulink)"]
-        SOLAR["Solar Generation"]
-        BATT["Battery Storage\n(State of Charge)"]
-        LOAD["Load Demand"]
-        WIND["Wind Contribution\n(stretch)"]
-    end
-
-    subgraph CTRL["Controller (target: SystemVerilog FSM)"]
-        FSM{{"Finite State Machine"}}
-        S1["Idle"]
-        S2["Charging"]
-        S3["Discharging"]
-        S4["Load-Shed (planned)"]
-        S5["Fault / Low-Energy (planned)"]
-        FSM --- S1
-        FSM --- S2
-        FSM --- S3
-        FSM -.-> S4
-        FSM -.-> S5
-    end
-
-    subgraph OUT["Controller Outputs"]
-        O1["Charge Battery"]
-        O2["Discharge Battery"]
-        O3["Shed Noncritical Load (planned)"]
-        O5["Status Display (planned)"]
-    end
-
-    SOLAR -->|solar current| FSM
-    BATT -->|battery SoC| FSM
-    LOAD -->|load current| FSM
-    WIND -.->|optional| FSM
-
-    FSM --> O1 --> BATT
-    FSM --> O2 --> BATT
-    FSM -.-> O3 --> LOAD
-    FSM -.-> O5
+stateDiagram-v2
+    [*] --> IDLE
+    IDLE --> CHARGING: charger connected and not full
+    IDLE --> DISCHARGING: load connected and SoC above critical
+    CHARGING --> IDLE: charger disconnected or battery full
+    DISCHARGING --> IDLE: load disconnected or SoC critical
+    DISCHARGING --> LOAD_SHED: low SoC and high demand
+    LOAD_SHED --> CHARGING: charger connected
+    LOAD_SHED --> IDLE: SoC critical
+    LOAD_SHED --> DISCHARGING: battery or demand recovers
+    IDLE --> FAULT: fault detected
+    CHARGING --> FAULT: fault detected
+    DISCHARGING --> FAULT: fault detected
+    LOAD_SHED --> FAULT: fault detected
+    FAULT --> IDLE: fault absent and clear asserted
 ```
 
-Dashed lines = not yet implemented.
+Fault detection has priority over normal operation and immediately sets the battery command to zero.
 
----
+### Shared Q8.8 values
 
-## Repository Structure
+All three versions will use the same transition table, constants, and exported test vectors.
 
-> Reflects what's actually in the repo today — sections will grow as each stage is built.
+| Constant | Integer value | Engineering value |
+|---|---:|---:|
+| `SOC_FULL` | 230 | approximately 0.90 |
+| `SOC_LOW` | 77 | approximately 0.30 |
+| `SOC_CRITICAL` | 26 | approximately 0.10 |
+| `SURPLUS_THRESHOLD` | +/-512 | +/-2.00 A |
+| `HIGH_DEMAND` | 1280 | 5.00 A |
+| Command step | 26 per clock | approximately 0.102 A per clock |
 
-```text
-Smart-Energy-Optimzer/
-├── README.md
-├── simulink/
-│   └── SmartEnergyOptimizer.slx      # plant model + rule-based controller
-└── docs/                              # (planned) design notes, scenario writeups
-```
+For Q8.8 values: `real value = integer value / 256`.
 
-Planned additions as the project progresses: `rtl/` (SystemVerilog FSM + package), `tb/` (testbench), `arduino/` (embedded controller port), `scripts/` (batch scenario runner + analysis).
+## Known Open Items
 
----
-
-## Quick Start
-
-### 1) Clone the repository
-
-```bash
-git clone https://github.com/Kami1230/Smart-Energy-Optimzer.git
-cd Smart-Energy-Optimzer
-```
-
-### 2) Open and run the plant model
-
-1. Open MATLAB
-2. Navigate to `simulink/`
-3. Open `SmartEnergyOptimizer.slx`
-4. Run with `Load_Demand_Step`, `Irradiance_max`, and the controller's dead-band constants as documented below
-5. Inspect the `Ipv`, `Iload`, `IBattery`, `V_bus`, and `Battery SOC` scopes
-
-### Key parameters (for reproducing the validated checkpoint)
-
-| Parameter | Value |
-|---|---|
-| PV series cells | 9 |
-| PV short-circuit current (Isc) | 7.34 A |
-| Battery capacity | 27 A·hr |
-| Battery initial SoC | 0.5 |
-| Series resistor (battery branch) | 0.05 Ω |
-| Controller charge/discharge threshold | ±2 A (Surplus) |
-| Controller SoC bounds | 0.1 – 0.9 |
-| Rate Limiter slew rate | ±1 A/s |
-
----
-
-## Validation Scenarios (current)
-
-1. Steady-state (flat load, flat solar) — confirms no errors, sane bus voltage
-2. Load step (1A → 3A) — confirms battery/PV branches respond correctly
-3. Solar step (100% → 30% availability) — confirms PV output tracks irradiance
-4. Combined step scenario — both changes active in one run
-5. Controller charge/discharge validation — confirms Charge_Enable / Discharge_Enable fire correctly and IBattery tracks the Ipv−Iload residual (not just mirroring one branch)
-
-Planned (once Stateflow/Arduino/SystemVerilog versions exist): the six-scenario suite from the original design (battery nearly full/empty, rapidly changing demand, extended low-generation period) will be used to cross-validate all implementations against each other.
-
----
+- The +/-2 A surplus dead zone is defined but not applied in the RTL.
+- `CHARGING` and `DISCHARGING` do not clamp the battery-command sign.
+- RTL high demand uses net deficit; the design document uses `Iload`.
+- The M3 closed-loop plant simulation has not started.
 
 ## Roadmap
 
-- [x] Build and validate Simulink plant model
-- [x] Build rule-based controller with hysteresis + slew limiting
-- [ ] Rebuild controller logic as a Stateflow chart
-- [ ] Port controller logic to Arduino C/C++
-- [ ] Implement SystemVerilog FSM + testbench
-- [ ] Cross-validate all three controller implementations against the same plant model
-- [ ] Add load-shedding / priority-tier logic
-- [ ] Add wind as a second renewable source
-- [ ] Build a results dashboard
+### V1 - Simulink and SystemVerilog
 
----
+Complete the dead-zone decision, build the closed-loop testbench plant, and run six scenarios:
 
-## Acknowledgments
+1. High solar and low load
+2. Low solar and high load
+3. Battery nearly full
+4. Battery nearly empty
+5. Rapidly changing demand
+6. Extended low generation
 
-Inspired by controller-in-the-loop and microgrid simulation workflows used in modern power systems R&D. Originally scoped as a physical VAWT prototype for a science fair; pivoted to this simulation-first approach.
+V1 is complete when these scenarios produce plots for SoC, surplus, state, and command, and the repository is tagged `v1.0-sim`.
+
+### V2 - Arduino
+
+- Port the V1 FSM and Q8.8 contract to C.
+- Run the V1 vectors through the Arduino over serial and compare results.
+- Add controls, state indicators, current sensing, load switching, PWM output, and serial logging.
+- Compare hardware traces with Simulink to calibrate the model.
+
+### V3 - FPGA
+
+- Synthesize `battery_fsm.sv` on a low-cost FPGA board.
+- Use the Arduino as the plant and sensor interface over UART or SPI.
+- Add tested synchronizer, debouncer, UART, and PWM modules.
+- Record synthesis, timing, and resource reports.
+
+Later stretch goals include Stateflow, wind generation, load-priority tiers, and a results dashboard.
+
+## Run the V1 Tests
+
+Requirements: Icarus Verilog for RTL simulation and MATLAB/Simulink for the model and vector export.
+Run all commands from the repository root because the testbenches load `vectors/*.hex` using relative paths.
+
+### Directed FSM test
+
+```bash
+iverilog -g2012 -o directed.vvp rtl/battery_fsm_pkg.sv rtl/battery_fsm.sv tb/battery_fsm_directed_tb.sv
+vvp directed.vvp
+```
+
+Expected summary:
+
+```text
+91 checks, 0 failures, 3 review items
+ALL CHECKS PASSED
+```
+
+The review items correspond to the dead-zone and command-sign issues listed above.
+
+### Simulink-vector comparison
+
+```bash
+iverilog -g2012 -o tb.vvp rtl/battery_fsm_pkg.sv rtl/battery_fsm.sv tb/battery_fsm_tb.sv
+vvp tb.vvp
+```
+
+Expected result: **0 mismatches across 199 compared samples**. The first two samples are skipped while the pipeline fills.
+
+### Regenerate the vectors
+
+Open `SmartEnergyOptimizer.prj` in MATLAB and run:
+
+```matlab
+run("scripts/export_fsm_vectors.m")
+```
+
+## Repository Layout
+
+```text
+SmartEnergyOptimizer.slx     Simulink plant and reference controller
+rtl/                        SystemVerilog controller
+tb/                         RTL testbenches
+vectors/                    Shared Q8.8 regression vectors
+scripts/                    MATLAB vector-export script
+docs/                       Design notes and waveform results
+archive/                    Previous models and retired test scaffolds
+fw/                         Arduino firmware (planned)
+fpga/                       FPGA integration (planned)
+```
+
+The V1 tag `v1.0-sim` will define the specification that V2 and V3 must match.
