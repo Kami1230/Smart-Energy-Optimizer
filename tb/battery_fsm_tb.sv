@@ -44,7 +44,8 @@ module battery_fsm_tb;
                 end
             end
         end
-        $display("Done: %0d mismatches out of %d samples", errors, N);
+        $display("Done: %0d mismatches across %0d compared samples (%0d skipped for latency)",
+                 errors, N - LAT, LAT);
         $finish;
     end
 endmodule
