@@ -69,6 +69,15 @@ stateDiagram-v2
 
 Fault detection has priority over normal operation and immediately sets the battery command to zero.
 
+### Frozen power-decision rules
+
+- `surplus = solar generation - load demand`
+- Positive battery command charges the battery; negative battery command discharges it.
+- The inclusive dead zone is `-2.00 A <= surplus <= +2.00 A`, where the target command is zero.
+- `CHARGING` can only produce a positive command above `+2.00 A`.
+- `DISCHARGING` can only produce a negative command below `-2.00 A`.
+- High demand means a net deficit greater than `5.00 A` (`surplus < -5.00 A`), not raw load current.
+
 ### Shared Q8.8 values
 
 All three versions will use the same transition table, constants, and exported test vectors.
@@ -86,16 +95,15 @@ For Q8.8 values: `real value = integer value / 256`.
 
 ## Known Open Items
 
-- The +/-2 A surplus dead zone is defined but not applied in the RTL.
-- `CHARGING` and `DISCHARGING` do not clamp the battery-command sign.
-- RTL high demand uses net deficit; the design document uses `Iload`.
+- The active-state exit paths still need to apply the frozen dead-zone rules consistently.
+- The directed and Simulink-vector testbenches need to be updated for the frozen behavior.
 - The M3 closed-loop plant simulation has not started.
 
 ## Roadmap
 
 ### V1 - Simulink and SystemVerilog
 
-Complete the dead-zone decision, build the closed-loop testbench plant, and run six scenarios:
+Finish the dead-zone transition coverage, build the closed-loop testbench plant, and run six scenarios:
 
 1. High solar and low load
 2. Low solar and high load
@@ -141,7 +149,7 @@ Expected summary:
 ALL CHECKS PASSED
 ```
 
-The review items correspond to the dead-zone and command-sign issues listed above.
+The current testbench review items predate the frozen dead-zone and command-sign rules and need to become pass/fail checks.
 
 ### Simulink-vector comparison
 

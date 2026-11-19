@@ -16,7 +16,7 @@ module battery_fsm_directed_tb;
     battery_fsm dut (.*);
     always #5 clk = ~clk;
 
-    int errors = 0, reviews = 0, checks = 0;
+    int errors = 0, checks = 0;
 
     // Scenario values (Q8.8)
     localparam fixed_t SOC_MID = 16'sd128;    // 0.50
@@ -109,18 +109,25 @@ module battery_fsm_directed_tb;
         do_reset; load_conn = 1; surplus = I_DIS; tick;
         expect_state(DISCHARGING, "A3 IDLE->DISCHARGING (load, has charge)");
 
-        do_reset; charger_conn = 1; load_conn = 1; tick;
+        do_reset; charger_conn = 1, surplus = SURPLUS_THRESHOLD, tick;
+        expect_state(IDLE, "surplus exactly +2 A remains in dead zone");
+
+        do_reset; charger_conn = 1, surplus = -SURPLUS_THRESHOLD, tick;
+        expect_state(IDLE, "surplus exactly -2 A remains in dead zone");
+
+
+        do_reset; charger_conn = 1; load_conn = 1; surplus = I_CHG; tick;
         expect_state(CHARGING, "A4 charger+load both connected -> CHARGING first");
 
-        do_reset; charger_conn = 1; soc = SOC_FULL; tick;
+        do_reset; charger_conn = 1; soc = SOC_FULL; surplus = I_CHG; tick;
         expect_state(IDLE, "A5a charger + full battery stays IDLE");
-        load_conn = 1; tick;
+        load_conn = 1; surplus = I_DIS; tick;
         expect_state(DISCHARGING, "A5b charger + full + load -> DISCHARGING");
 
-        do_reset; charger_conn = 1; soc = SOC_FULL - 1; tick;
+        do_reset; charger_conn = 1; soc = SOC_FULL - 1; surplus = I_CHG; tick;
         expect_state(CHARGING, "A6 soc just below FULL still charges");
 
-        do_reset; load_conn = 1; soc = SOC_CRITICAL; tick;
+        do_reset; load_conn = 1; soc = SOC_CRITICAL; surplus = I_DIS; tick;
         expect_state(IDLE, "A7a load but soc==CRITICAL: no usable charge");
         soc = SOC_CRITICAL + 1; tick;
         expect_state(DISCHARGING, "A7b load and soc just above CRITICAL");
@@ -182,7 +189,7 @@ module battery_fsm_directed_tb;
         enter_load_shed; ticks(3);
         expect_state(LOAD_SHED, "D1 LOAD_SHED holds (low + high demand)");
 
-        enter_load_shed; charger_conn = 1; tick;
+        enter_load_shed; charger_conn = 1; surplus = I_CHG; tick;
         expect_state(CHARGING, "D2 LOAD_SHED->CHARGING (charger connected)");
 
         enter_load_shed; soc = SOC_CRITICAL - 1; tick;
@@ -200,7 +207,7 @@ module battery_fsm_directed_tb;
         enter_load_shed; fault_detect = 1; tick;
         expect_state(FAULT, "D6 LOAD_SHED->FAULT");
 
-        enter_load_shed; charger_conn = 1; soc = SOC_CRITICAL - 1; tick;
+        enter_load_shed; charger_conn = 1; soc = SOC_CRITICAL - 1; surplus = I_CHG; tick;
         expect_state(CHARGING, "D7 priority: charger beats critical");
 
         $display("=== E. FAULT behavior ===");
@@ -253,27 +260,20 @@ module battery_fsm_directed_tb;
         expect_state(FAULT, "G5b in FAULT");
         expect_cmd(16'sd0, "G5c FAULT cuts cmd immediately (no ramp-down)");
 
-        // Design-decision items: print REVIEW instead of FAIL
         enter_charging; surplus = I_DIS; ticks(45);
-        if (battery_cmd[15] === 1'b1) begin
-            reviews++;
-            $display("REVIEW CHARGING state is commanding discharge (cmd=%0d) when surplus goes negative", $signed(battery_cmd));
-        end
+        expect_state(IDLE, "opposite surplus exits CHARGING");
+        expect_cmd(16'sd0, "no discharge command while leaving CHARGING");
 
         enter_discharging; surplus = I_CHG; ticks(45);
-        if (battery_cmd[15] === 1'b0 && battery_cmd !== 16'sd0) begin
-            reviews++;
-            $display("REVIEW DISCHARGING state is commanding charge (cmd=%0d) when surplus goes positive", $signed(battery_cmd));
-        end
+        expect_state(IDLE, "opposite surplus exits DISHARGING");
+        expect_cmd(16'sd0, "no charge command while leaving DISCHARGING");
 
         enter_charging; surplus = 16'sd100; ticks(5);
-        if (battery_cmd !== 16'sd0) begin
-            reviews++;
-            $display("REVIEW surplus 0.4 A (< SURPLUS_THRESHOLD) still produces cmd=%0d: dead-zone not applied", $signed(battery_cmd));
-        end
+        expect_state(IDLE, "dead-zone surplus exits CHARGING");
+        expect_cmd(16'sd0, "dead-zone surplus produces zero command");
 
         $display("-----------------------------------------------");
-        $display("%0d checks, %0d failures, %0d review items", checks, errors, reviews);
+        $display("%0d checks, %0d failures, %0d review items", checks, errors);
         if (errors == 0) $display("ALL CHECKS PASSED");
         $finish;
     end

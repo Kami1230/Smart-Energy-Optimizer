@@ -47,31 +47,33 @@ module battery_fsm (
         end else begin
             case (state)
                 IDLE: begin 
-                    if (charger_conn && !battery_full)
+                    if (charger_conn && !battery_full && surplus_pos)
                         next_state = CHARGING;
-                    else if (load_conn && battery_has_charge)
+                    else if (load_conn && battery_has_charge && surplus_neg)
                         next_state = DISCHARGING;
                 end
 
                 CHARGING: begin
-                    if (!charger_conn || battery_full )
+                    if (!charger_conn || battery_full || !surplus_pos)
                         next_state = IDLE;
                 end
 
                 DISCHARGING: begin
-                    if (!load_conn || battery_critical)
+                    if (!load_conn || battery_critical || !surplus_neg)
                         next_state = IDLE;
                     else if (battery_low && high_demand)
                         next_state = LOAD_SHED;
                 end
 
                 LOAD_SHED: begin
-                    if (charger_conn)
+                    if (charger_conn && !battery_full && surplus_pos)
                         next_state = CHARGING;
                     else if (battery_critical)
                         next_state = IDLE;
-                    else if (!battery_low || !high_demand)
+                    else if (surplus_neg && load_conn && (!battery_low || !high_demand))
                         next_state = DISCHARGING;
+                    else if (!load_conn || !surplus_neg)
+                        next_state = IDLE;
                 end
 
                 FAULT: begin
@@ -104,8 +106,8 @@ module battery_fsm (
     // ----------------------OUTPUT LOGIC(Moore)----------------------------/
     always_comb begin
         case(state)
-            CHARGING:    target = surplus; // command = available surplus
-            DISCHARGING: target = surplus; // negative surplus = discharge amount
+            CHARGING:    target = surplus_pos ? surplus : '0; // command = available surplus
+            DISCHARGING: target = surplus_neg ? surplus : '0; // negative surplus = discharge amount
             default:     target = '0;      // IDLE, LOAD_SHED, FAULT: no command
         endcase
     end

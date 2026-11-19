@@ -30,10 +30,10 @@ module battery_fsm_tb;
 
         for (int i = 0; i < N; i++) begin
             @(negedge clk);
-            surplus     = surplus_mem[i];
-            soc         = soc_mem[i];
-            charger_conn = (surplus > 0);
-            load_conn   = (surplus < 0);
+            surplus      = surplus_mem[i];
+            soc          = soc_mem[i];
+            charger_conn = (surplus >  SURPLUS_THRESHOLD);
+            load_conn    = (surplus < -SURPLUS_THRESHOLD);
             #1;                             // lets combinational outputs settle
 
             if (i >= LAT) begin
@@ -48,4 +48,4 @@ module battery_fsm_tb;
                  errors, N - LAT, LAT);
         $finish;
     end
-endmodule
+endmodule 
