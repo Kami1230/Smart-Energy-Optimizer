@@ -123,15 +123,36 @@ This stack gives a realistic hardware/software split that matches controller-in-
 
 # **8\. CONTROL LOGIC**
 
-A good first controller design is a **finite state machine** with states such as:
+The controller is a five-state finite state machine:
 
-* Normal operation.  
-* Charging mode.  
-* Discharging mode.  
-* Load-shed mode.  
-* Fault or low-energy mode.
+* `IDLE`
+* `CHARGING`
+* `DISCHARGING`
+* `LOAD_SHED`
+* `FAULT`
 
-The controller can examine battery state, solar availability, and load demand, then move between these states according to predefined thresholds. This keeps the behavior understandable and makes it easier to debug than a more complex optimization algorithm at the start.\[[studylib](https://studylib.net/doc/27833437/1-fsm-in-systemverilog)\]
+Power surplus is defined as solar generation minus load demand. The inclusive dead zone is `-2.00 A <= surplus <= +2.00 A`; inside this range the target battery command is zero. Charging requires a surplus above `+2.00 A`, discharging requires a deficit below `-2.00 A`, and high demand is a net deficit greater than `5.00 A`.
+
+```mermaid
+stateDiagram-v2
+    [*] --> IDLE
+    IDLE --> CHARGING: charger connected, not full, surplus > +2 A
+    IDLE --> DISCHARGING: load connected, SoC above critical, surplus < -2 A
+    CHARGING --> IDLE: charger disconnected, full, or surplus <= +2 A
+    DISCHARGING --> IDLE: load disconnected, SoC critical, or surplus >= -2 A
+    DISCHARGING --> LOAD_SHED: low SoC and deficit > 5 A
+    LOAD_SHED --> CHARGING: charger connected, not full, surplus > +2 A
+    LOAD_SHED --> IDLE: SoC critical
+    LOAD_SHED --> IDLE: load disconnected or deficit inside dead zone
+    LOAD_SHED --> DISCHARGING: deficit remains and battery or demand recovers
+    IDLE --> FAULT: fault detected
+    CHARGING --> FAULT: fault detected
+    DISCHARGING --> FAULT: fault detected
+    LOAD_SHED --> FAULT: fault detected
+    FAULT --> IDLE: fault absent and clear asserted
+```
+
+Fault detection has priority over normal transitions and immediately sets the battery command to zero.
 
 # **9\. SIMULATION SCENARIOS**
 
