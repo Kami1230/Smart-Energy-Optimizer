@@ -6,13 +6,13 @@
 
 A five-state battery and microgrid controller for a simulated microgrid or event venue. It decides when to charge, discharge, shed non-critical load, remain idle, or enter a fault state.
 
-The project will implement the same controller specification in three forms:
+The project is organized into three stages:
 
 | Version | Status | Focus |
 |---|---|---|
 | V1 - Simulink and SystemVerilog | **IN PROGRESS** | Modeling, RTL, fixed-point arithmetic, verification |
-| V2 - Arduino | **PLANNED** | Embedded C, sensors, actuators, model calibration |
-| V3 - FPGA | **PLANNED / STRETCH** | Synthesis, interfaces, timing, clock-domain basics |
+| V2 - Arduino on the bench | **PLANNED** | Embedded C, serial regression, sensors, and power hardware |
+| V3 - Real-world calibration | **PLANNED / NOT FULLY SCOPED** | Calibrating the Simulink model against physical measurements |
 
 ## Current Status
 
@@ -26,7 +26,7 @@ V1 combines a Simulink microgrid model with a SystemVerilog controller using sig
 
 Current verification results:
 
-- **91 directed checks passed**
+- **99 directed checks passed**
 - **0 mismatches across 199 compared samples**
 - The first two of 201 loaded samples are skipped for the two-clock pipeline latency; tolerance is +/-16 LSB
 
@@ -52,14 +52,14 @@ The Simulink model provides the plant and reference output; exported vectors ver
 ```mermaid
 stateDiagram-v2
     [*] --> IDLE
-    IDLE --> CHARGING: charger connected and not full
-    IDLE --> DISCHARGING: load connected and SoC above critical
-    CHARGING --> IDLE: charger disconnected or battery full
-    DISCHARGING --> IDLE: load disconnected or SoC critical
+    IDLE --> CHARGING: charger connected, not full, surplus > +2 A
+    IDLE --> DISCHARGING: load connected, SoC above critical, surplus < -2 A
+    CHARGING --> IDLE: charger disconnected, full, or surplus <= +2 A
+    DISCHARGING --> IDLE: load disconnected, SoC critical, or surplus >= -2 A
     DISCHARGING --> LOAD_SHED: low SoC and high demand
-    LOAD_SHED --> CHARGING: charger connected
+    LOAD_SHED --> CHARGING: charger connected, not full, surplus > +2 A
     LOAD_SHED --> IDLE: SoC critical
-    LOAD_SHED --> DISCHARGING: battery or demand recovers
+    LOAD_SHED --> DISCHARGING: deficit remains and battery or demand recovers
     IDLE --> FAULT: fault detected
     CHARGING --> FAULT: fault detected
     DISCHARGING --> FAULT: fault detected
@@ -69,7 +69,7 @@ stateDiagram-v2
 
 Fault detection has priority over normal operation and immediately sets the battery command to zero.
 
-### Frozen power-decision rules
+### Power-decision rules
 
 - `surplus = solar generation - load demand`
 - Positive battery command charges the battery; negative battery command discharges it.
@@ -95,15 +95,13 @@ For Q8.8 values: `real value = integer value / 256`.
 
 ## Known Open Items
 
-- The active-state exit paths still need to apply the frozen dead-zone rules consistently.
-- The directed and Simulink-vector testbenches need to be updated for the frozen behavior.
 - The M3 closed-loop plant simulation has not started.
 
 ## Roadmap
 
 ### V1 - Simulink and SystemVerilog
 
-Finish the dead-zone transition coverage, build the closed-loop testbench plant, and run six scenarios:
+Build the closed-loop testbench plant and run six scenarios:
 
 1. High solar and low load
 2. Low solar and high load
@@ -114,19 +112,21 @@ Finish the dead-zone transition coverage, build the closed-loop testbench plant,
 
 V1 is complete when these scenarios produce plots for SoC, surplus, state, and command, and the repository is tagged `v1.0-sim`.
 
-### V2 - Arduino
+### V2 - Arduino on the Bench
 
 - Port the V1 FSM and Q8.8 contract to C.
-- Run the V1 vectors through the Arduino over serial and compare results.
-- Add controls, state indicators, current sensing, load switching, PWM output, and serial logging.
-- Compare hardware traces with Simulink to calibrate the model.
+- Run the existing V1 vectors through the Arduino over serial and compare its results with the RTL.
+- Add bench controls, state indicators, current sensing, load switching, PWM output, and serial logging.
+- Connect the controller to safe, low-power battery and load hardware with real sensors.
 
-### V3 - FPGA
+### V3 - Closing the Loop with the Real World
 
-- Synthesize `battery_fsm.sv` on a low-cost FPGA board.
-- Use the Arduino as the plant and sensor interface over UART or SPI.
-- Add tested synchronizer, debouncer, UART, and PWM modules.
-- Record synthesis, timing, and resource reports.
+This stage is planned but not fully scoped. The goal is to:
+
+- Record measurements from the V2 hardware.
+- Compare the physical measurements with the Simulink results.
+- Calibrate the Simulink plant parameters against the real system.
+- Possibly use a real single-cell PV panel as the source.
 
 Later stretch goals include Stateflow, wind generation, load-priority tiers, and a results dashboard.
 
@@ -145,11 +145,9 @@ vvp directed.vvp
 Expected summary:
 
 ```text
-91 checks, 0 failures, 3 review items
+99 checks, 0 failures
 ALL CHECKS PASSED
 ```
-
-The current testbench review items predate the frozen dead-zone and command-sign rules and need to become pass/fail checks.
 
 ### Simulink-vector comparison
 
@@ -179,7 +177,6 @@ scripts/                    MATLAB vector-export script
 docs/                       Design notes and waveform results
 archive/                    Previous models and retired test scaffolds
 fw/                         Arduino firmware (planned)
-fpga/                       FPGA integration (planned)
 ```
 
-The V1 tag `v1.0-sim` will define the specification that V2 and V3 must match.
+The V1 tag `v1.0-sim` will define the controller specification that V2 must match and the simulation baseline used for V3 calibration.

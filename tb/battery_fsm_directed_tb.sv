@@ -109,10 +109,10 @@ module battery_fsm_directed_tb;
         do_reset; load_conn = 1; surplus = I_DIS; tick;
         expect_state(DISCHARGING, "A3 IDLE->DISCHARGING (load, has charge)");
 
-        do_reset; charger_conn = 1, surplus = SURPLUS_THRESHOLD, tick;
+        do_reset; charger_conn = 1; surplus = SURPLUS_THRESHOLD; tick;
         expect_state(IDLE, "surplus exactly +2 A remains in dead zone");
 
-        do_reset; charger_conn = 1, surplus = -SURPLUS_THRESHOLD, tick;
+        do_reset; charger_conn = 1; surplus = -SURPLUS_THRESHOLD; tick;
         expect_state(IDLE, "surplus exactly -2 A remains in dead zone");
 
 
@@ -265,7 +265,7 @@ module battery_fsm_directed_tb;
         expect_cmd(16'sd0, "no discharge command while leaving CHARGING");
 
         enter_discharging; surplus = I_CHG; ticks(45);
-        expect_state(IDLE, "opposite surplus exits DISHARGING");
+        expect_state(IDLE, "opposite surplus exits DISCHARGING");
         expect_cmd(16'sd0, "no charge command while leaving DISCHARGING");
 
         enter_charging; surplus = 16'sd100; ticks(5);
@@ -273,7 +273,7 @@ module battery_fsm_directed_tb;
         expect_cmd(16'sd0, "dead-zone surplus produces zero command");
 
         $display("-----------------------------------------------");
-        $display("%0d checks, %0d failures, %0d review items", checks, errors);
+        $display("%0d checks, %0d failures", checks, errors);
         if (errors == 0) $display("ALL CHECKS PASSED");
         $finish;
     end
